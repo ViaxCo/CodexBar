@@ -96,7 +96,7 @@ struct PreferencesPaneSmokeTests {
         #expect(MenuBarSettingsMenuOptions.displayModes == MenuBarDisplayMode.allCases)
         #expect(MenuBarSettingsMenuOptions.iconStyles == MenuBarIconStyle.allCases)
         #expect(MenuBarSettingsMenuOptions.switcherRows == SwitcherRowsOption.allCases)
-        #expect(MenuSettingsMenuOptions.weeklyProgressWorkDays == [nil, 4, 5, 7])
+        #expect(MenuSettingsMenuOptions.weeklyProgressWorkDays == [nil, 4, 5, 6, 7])
         #expect(MenuSettingsMenuOptions.weeklyProgressWorkDaysLabel(nil) == L("Automatic"))
         #expect(MenuSettingsMenuOptions.workdayTickAppearances == WorkdayTickAppearance.allCases)
         #expect(MenuSettingsMenuOptions.multiAccountLayouts == MultiAccountMenuLayout.allCases)
