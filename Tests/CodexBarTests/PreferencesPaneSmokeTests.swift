@@ -570,6 +570,13 @@ struct PreferencesPaneSmokeTests {
         }
     }
 
+    @Test(arguments: [("fr", "6 jours"), ("ar", "٦ أيام"), ("fa", "۶ روز"), ("ja", "6日間")])
+    func `six work days label keeps the number first`(language: String, expected: String) {
+        CodexBarLocalizationOverride.$appLanguage.withValue(language) {
+            #expect(MenuSettingsMenuOptions.weeklyProgressWorkDaysLabel(6) == expected)
+        }
+    }
+
     @Test
     func `italian language preference resolves italian strings`() {
         let settings = Self.makeSettingsStore(suite: "PreferencesPaneSmokeTests-language-italian")
