@@ -109,6 +109,7 @@ extension UsageStore {
             self.claudeSwapLastError = nil
             self.claudeSwapRevision &+= 1
             self.persistWidgetSnapshot(reason: "claude-swap-accounts")
+            await self.recordClaudeSwapPlanUtilizationHistory(snapshots)
         } catch is CancellationError {
             return
         } catch {
@@ -123,6 +124,56 @@ extension UsageStore {
                 self.claudeSwapLastError = message
                 self.claudeSwapRevision &+= 1
             }
+        }
+    }
+
+    func recordClaudeSwapPlanUtilizationHistory(_ accounts: [ProviderAccountUsageSnapshot]) async {
+        guard self.shouldRecordPlanUtilizationHistory(for: .claude) else { return }
+        let samplesByAccountKey = accounts.compactMap { account -> (String, [PlanUtilizationSeriesSample])? in
+            guard account.error == nil,
+                  !account.usesLastKnownUsage,
+                  let snapshot = account.snapshot,
+                  let accountKey = Self.claudeSwapPlanUtilizationAccountKey(for: account)
+            else { return nil }
+            return (accountKey, self.planUtilizationSeriesSamples(
+                provider: .claude,
+                snapshot: snapshot,
+                capturedAt: snapshot.updatedAt))
+        }
+        guard !samplesByAccountKey.isEmpty else { return }
+        if !self.planUtilizationHistoryLoaded {
+            _ = await self.planUtilizationHistoryLoadTask?.result
+        }
+
+        let instanceID = UsageProvider.claude.instanceID
+        let originalBuckets = self.planUtilizationHistory[instanceID] ?? PlanUtilizationHistoryBuckets()
+        var buckets = originalBuckets
+        for (accountKey, samples) in samplesByAccountKey {
+            guard let histories = Self.updatedPlanUtilizationHistories(
+                existingHistories: buckets.histories(for: accountKey),
+                samples: samples)
+            else { continue }
+            buckets.setHistories(histories, for: accountKey)
+        }
+        guard buckets != originalBuckets else { return }
+        self.planUtilizationHistory[instanceID] = buckets
+        self.planUtilizationHistoryRevision &+= 1
+        await self.planUtilizationPersistenceCoordinator.enqueue(self.planUtilizationHistory)
+    }
+
+    func claudeSwapPlanUtilizationHistorySelection(
+        for account: ProviderAccountUsageSnapshot) -> PlanUtilizationHistorySelection
+    {
+        guard self.planUtilizationHistoryLoaded,
+              let accountKey = Self.claudeSwapPlanUtilizationAccountKey(for: account)
+        else { return .unavailable }
+        let buckets = self.planUtilizationHistory[UsageProvider.claude.instanceID] ?? PlanUtilizationHistoryBuckets()
+        return buckets.selection(for: accountKey)
+    }
+
+    nonisolated static func claudeSwapPlanUtilizationAccountKey(for account: ProviderAccountUsageSnapshot) -> String? {
+        ClaudeSwapRetainedUsageStore.ownershipFingerprint(for: account).map {
+            self.claudeSwapPlanUtilizationAccountKeyPrefix + $0
         }
     }
 

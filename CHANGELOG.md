@@ -2,6 +2,10 @@
 
 ## 0.76.1 — Unreleased
 
+### Fixed
+
+- Claude: show the session forecast on claude-swap account cards by recording each account's usage history under its opaque owner fingerprint (#4566). Thanks @ViaxCo!
+
 ## 0.76.0 — 2026-10-15
 
 ### Highlights

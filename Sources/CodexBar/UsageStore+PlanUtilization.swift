@@ -15,6 +15,7 @@ extension UsageStore {
     nonisolated static let weeklyWindowMinutes = 7 * 24 * 60
     nonisolated static let planUtilizationUnscopedPreferredKey = "__unscoped__"
     private nonisolated static let claudeOAuthPlanUtilizationAccountKeyPrefix = "__claude_oauth__:"
+    nonisolated static let claudeSwapPlanUtilizationAccountKeyPrefix = "__claude_swap__:"
 
     func supportsPlanUtilizationHistory(for provider: UsageProvider) -> Bool {
         let capability = ProviderDescriptorRegistry.descriptor(for: provider).history
@@ -348,13 +349,13 @@ extension UsageStore {
         await self.planUtilizationPersistenceCoordinator.enqueue(snapshotToPersist)
     }
 
-    private func shouldRecordPlanUtilizationHistory(for provider: UsageProvider) -> Bool {
+    func shouldRecordPlanUtilizationHistory(for provider: UsageProvider) -> Bool {
         let capability = ProviderDescriptorRegistry.descriptor(for: provider).history
         return capability.supportsPlanUtilization &&
             (capability.alwaysTracksPlanUtilization || self.settings.historicalTrackingEnabled)
     }
 
-    private nonisolated static func updatedPlanUtilizationHistories(
+    nonisolated static func updatedPlanUtilizationHistories(
         existingHistories: [PlanUtilizationSeriesHistory],
         samples: [PlanUtilizationSeriesSample]) -> [PlanUtilizationSeriesHistory]?
     {
@@ -594,7 +595,7 @@ extension UsageStore {
         }
     }
 
-    private func planUtilizationSeriesSamples(
+    func planUtilizationSeriesSamples(
         provider: UsageProvider,
         snapshot: UsageSnapshot,
         capturedAt: Date,
@@ -1387,7 +1388,9 @@ extension UsageStore {
         if providerBuckets.preferredAccountKey == Self.planUtilizationUnscopedPreferredKey {
             return nil
         }
-        let knownAccountKeys = providerBuckets.accounts.keys.sorted()
+        let knownAccountKeys = providerBuckets.accounts.keys
+            .filter { !$0.hasPrefix(Self.claudeSwapPlanUtilizationAccountKeyPrefix) }
+            .sorted()
         guard !knownAccountKeys.isEmpty else { return nil }
 
         if let preferredAccountKey = providerBuckets.preferredAccountKey,
