@@ -37,7 +37,7 @@ extension UsageStore {
 
     private nonisolated static let planUtilizationMinSampleIntervalSeconds: TimeInterval = 60 * 60
     private nonisolated static let planUtilizationResetEquivalenceToleranceSeconds: TimeInterval = 2 * 60
-    private nonisolated static let planUtilizationMaxSamples: Int = 24 * 730
+    nonisolated static let planUtilizationMaxSamples: Int = 24 * 730
 
     private struct PlanUtilizationSeriesKey: Hashable {
         let name: PlanUtilizationSeriesName
@@ -421,7 +421,7 @@ extension UsageStore {
         }
     }
 
-    private nonisolated static func updatedPlanUtilizationEntries(
+    nonisolated static func updatedPlanUtilizationEntries(
         existingEntries: inout [PlanUtilizationHistoryEntry],
         entry: PlanUtilizationHistoryEntry,
         isQuotaObservation: Bool = false) -> Bool
@@ -473,7 +473,7 @@ extension UsageStore {
     }
 
     /// First index i such that entries[i].capturedAt > capturedAt (endIndex if none).
-    private nonisolated static func planUtilizationEntryUpperBound(
+    nonisolated static func planUtilizationEntryUpperBound(
         entries: [PlanUtilizationHistoryEntry],
         capturedAt: Date) -> Int
     {
@@ -489,43 +489,6 @@ extension UsageStore {
         }
         return low
     }
-
-    #if DEBUG
-    nonisolated static func _updatedPlanUtilizationEntriesForTesting(
-        existingEntries: [PlanUtilizationHistoryEntry],
-        entry: PlanUtilizationHistoryEntry) -> [PlanUtilizationHistoryEntry]?
-    {
-        var entries = existingEntries
-        guard self.updatedPlanUtilizationEntries(existingEntries: &entries, entry: entry) else {
-            return nil
-        }
-        return entries
-    }
-
-    nonisolated static func _planUtilizationEntryUpperBoundForTesting(
-        entries: [PlanUtilizationHistoryEntry],
-        capturedAt: Date) -> Int
-    {
-        self.planUtilizationEntryUpperBound(entries: entries, capturedAt: capturedAt)
-    }
-
-    nonisolated static func _updatedPlanUtilizationHistoriesForTesting(
-        existingHistories: [PlanUtilizationSeriesHistory],
-        samples: [PlanUtilizationSeriesHistory]) -> [PlanUtilizationSeriesHistory]?
-    {
-        let normalized = samples.flatMap { history in
-            history.entries.map { entry in
-                PlanUtilizationSeriesSample(name: history.name, windowMinutes: history.windowMinutes, entry: entry)
-            }
-        }
-        return self.updatedPlanUtilizationHistories(existingHistories: existingHistories, samples: normalized)
-    }
-
-    nonisolated static var _planUtilizationMaxSamplesForTesting: Int {
-        self.planUtilizationMaxSamples
-    }
-
-    #endif
 
     private nonisolated static func clampedPercent(_ value: Double?) -> Double? {
         guard let value else { return nil }
@@ -817,7 +780,7 @@ extension UsageStore {
         return resolvedSnapshot.flatMap { Self.planUtilizationIdentityAccountKey(provider: provider, snapshot: $0) }
     }
 
-    private nonisolated static func planUtilizationAccountKey(
+    nonisolated static func planUtilizationAccountKey(
         provider: UsageProvider,
         account: ProviderTokenAccount?) -> String?
     {
@@ -827,7 +790,7 @@ extension UsageStore {
 
     /// Corroborated accounts use their account/profile identity; unbound credentials retain their own discriminator.
     /// A Keychain row reference alone cannot identify a principal because login can replace its credential in place.
-    private nonisolated static func claudeOAuthPlanUtilizationAccountKey(
+    nonisolated static func claudeOAuthPlanUtilizationAccountKey(
         historyOwnerIdentifier: String?) -> String?
     {
         guard let normalizedIdentifier = historyOwnerIdentifier?
@@ -904,7 +867,7 @@ extension UsageStore {
         return nil
     }
 
-    private nonisolated static func legacyClaudePlanUtilizationEmailAccountKey(snapshot: UsageSnapshot) -> String? {
+    nonisolated static func legacyClaudePlanUtilizationEmailAccountKey(snapshot: UsageSnapshot) -> String? {
         guard let identity = snapshot.identity(for: .claude) else { return nil }
         let normalizedEmail = identity.accountEmail?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1137,7 +1100,9 @@ extension UsageStore {
         let canAdoptUnscopedHistory = !readOnly && shouldAdoptUnscopedHistory
             && !(provider == .claude
                 && (providerBuckets.preferredAccountKey == Self.planUtilizationUnscopedPreferredKey
-                    || !providerBuckets.accounts.isEmpty))
+                    || providerBuckets.accounts.keys.contains {
+                        !$0.hasPrefix(Self.claudeSwapPlanUtilizationAccountKeyPrefix)
+                    }))
 
         if provider == .claude, isClaudeOAuthSample {
             if let oauthAccountKey = Self.claudeOAuthPlanUtilizationAccountKey(
@@ -1600,39 +1565,6 @@ extension UsageStore {
         }
         .sorted(by: PlanUtilizationSeriesHistory.precedes)
     }
-
-    #if DEBUG
-    nonisolated static func _planUtilizationAccountKeyForTesting(
-        provider: UsageProvider,
-        snapshot: UsageSnapshot) -> String?
-    {
-        self.planUtilizationIdentityAccountKey(provider: provider, snapshot: snapshot)
-    }
-
-    nonisolated static func _planUtilizationTokenAccountKeyForTesting(
-        provider: UsageProvider,
-        account: ProviderTokenAccount) -> String?
-    {
-        self.planUtilizationAccountKey(provider: provider, account: account)
-    }
-
-    nonisolated static func _claudeOAuthPlanUtilizationAccountKeyForTesting(
-        historyOwnerIdentifier: String?) -> String?
-    {
-        self.claudeOAuthPlanUtilizationAccountKey(
-            historyOwnerIdentifier: historyOwnerIdentifier)
-    }
-
-    nonisolated static func _legacyClaudePlanUtilizationEmailAccountKeyForTesting(snapshot: UsageSnapshot) -> String? {
-        self.legacyClaudePlanUtilizationEmailAccountKey(snapshot: snapshot)
-    }
-
-    nonisolated static func _codexLegacyPlanUtilizationEmailHashKeyForTesting(
-        normalizedEmail: String) -> String
-    {
-        self.codexLegacyPlanUtilizationEmailHashKey(for: normalizedEmail)
-    }
-    #endif
 }
 
 actor PlanUtilizationHistoryPersistenceCoordinator {
